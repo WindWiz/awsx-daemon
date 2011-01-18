@@ -16,8 +16,9 @@ example config file included called awsxd.conf.sample.
 	awsxd.py -h <listen_ip> -p <listen_port>
 
 5) Configure your AWS-X weather station to transmit packets to your host. Check
-the manual for details. All configuration is carried out through SMS to your 
-device. Short summary:
+the manual for details: http://www.dpspro.com/docs/pdf/awx_1v1_en.pdf
+
+All configuration is carried out through SMS to your device. Short summary:
 
 	Configure APN:
 	--------------
