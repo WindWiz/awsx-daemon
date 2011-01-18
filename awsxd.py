@@ -1,3 +1,6 @@
+# Copyright (c) 2010-2011 Magnus Olsson (magnus@minimum.se)
+# See LICENSE for details
+
 #! /usr/bin/env python
 """awsxd - AWS-X GSM weather station daemon
 This application implements an server for reception of AWS-X GSM weather 
