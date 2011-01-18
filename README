@@ -1,0 +1,60 @@
+Dependencies:
+- Python (tested with v2.6)
+- MySQL interface for python (python-mysqldb on debian, MySQL-python on Fedora/Red Hat) 
+
+Installation:
+1) Setup a database and proper privileges for it (awsxd needs INSERT-rights)
+2) Initialize the awsx table using the supplied scheme (table_layout.sql).
+	
+	mysql -u YOUR_USER -p YOUR_PASSWORD YOUR_DATABASE < table_layout.sql
+
+3) Edit the awsxd config (awsxd.conf) to reflect your database settings. There is an
+example config file included called awsxd.conf.sample.
+
+4) Start the AWS-X deamon
+
+	awsxd.py -h <listen_ip> -p <listen_port>
+
+5) Configure your AWS-X weather station to transmit packets to your host. Check
+the manual for details. All configuration is carried out through SMS to your 
+device. Short summary:
+
+	Configure APN:
+	--------------
+	This will configure the APN (Access Point Name) which is an operator-specific
+	setting. Contact your mobile operator for details.
+
+	#PWD<6-digit-password>#APN<apn>	
+	Example: #PWD123456#APNonline.telia.com (set APN to online.telia.com)
+
+	Configure packet destination:
+	-----------------------------
+	It's important that you zeropad your IP, so it's always xxx.yyy.zzz.vvv, for
+	example 8.8.8.8 should be 008.008.008.008.
+
+	#PWD<6-digit-password>#UIP<listen_ip>:<listen_port>
+	Example: #PWD123456#UIP083.168.059.029:9999 (transmit to 83.168.59.29:9999)
+
+	Configure sample interval: 
+	--------------------------
+	#PWD<6-digit-password>#DSI<1-60 minutes>
+	Example: #PWD123456#DSI10	(sample every 10 minutes)
+
+	Configure transmission interval: 
+	--------------------------------
+	#PWD<6-digit-password>#LGG<1-60 minutes>
+	This should always be equal or bigger than the sample interval
+	Example: #PWD123456#LGG10	(transmit every 10 minutes)
+
+6) (Optional) It is also possible to specify a callback file which is executed
+each time new data arrives on the socket. This is useful if you want to generate
+output from the data without polling the database on a regular basis. 
+The application is called with the relevant station name as its command line 
+argument, so you can choose to only update content for that station.
+
+Example:
+awsxd.py -c mycallback.sh
+
+mycallback.sh:
+#!/bin/sh
+echo "Station $* just sent us new data .. "
