@@ -16,12 +16,13 @@ For details on the GPRS functionality, check:
 usage: awsxd [options]
 
 options:
--p <port>		Server port number (default 9999)
+-p <port>		Server listen port number (default 9999)
 -h <host>		Server listen address (defaults to localhost)
 -v			Verbose output (may be used multiple times)
 -s <str>		Simulate <str> input, process and exit
 -c <path>		Launch <path> for each processed packet (station name passed as arg)
 -f <path>		Config file (defaults to 'awsxd.conf')
+-r <ip[:port]>		Replicate valid packets to given host and port (UDP)
 """
 
 import SocketServer
@@ -31,10 +32,13 @@ import MySQLdb
 import os.path
 import subprocess
 import ConfigParser
+import socket
 
 global verbose
 global callback
 global config
+global fwhost
+global fwport
 
 # Fancy name -> Part array index enum
 class Pkt:
@@ -212,6 +216,12 @@ def process(str):
 		if (ret):
 			print "Callback '%s' failed with retcode %d" % (callback, ret)
 
+	if (fwhost):
+		sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+		sock.sendto(str, (fwhost, fwport))
+		dbg("Packet replicated for %s:%d." % (fwhost, fwport))
+		sock.close()
+
 if __name__ == "__main__":
 	config = ConfigParser.RawConfigParser({'dbhost': 'localhost',
 										   'dbpass': '',
@@ -224,9 +234,11 @@ if __name__ == "__main__":
 	callback = False
 	cfgfile = "awsxd.conf"
 	simstr = False
+	fwhost = None
+	fwport = None
 		
 	try:
-		opts, args = getopt.getopt(sys.argv[1:], 'p:h:vs:c:f:')
+		opts, args = getopt.getopt(sys.argv[1:], 'p:h:vs:c:f:r:')
 	except getopt.error, msg:
 		usage(msg)
 
@@ -236,6 +248,16 @@ if __name__ == "__main__":
 		if o == '-h': host = a
 		if o == '-f': cfgfile = a
 		if o == '-s': simstr = a
+		if o == '-r':
+			hostport = a.split(':')
+			if len(hostport) > 2:
+				print "Invalid replication (-x) host '%s', aborting." % a
+				sys.exit(1)
+
+			fwhost = hostport[0]
+			if len(hostport) == 2:
+				fwport = int(hostport[1])
+
 		if o == '-c':
 			if (not os.path.isfile(a)):
 				print "No such callback file '%s', aborting." % a 
@@ -247,6 +269,11 @@ if __name__ == "__main__":
 
 	log("Using config '%s'" % cfgfile)
 	config.read(cfgfile)
+
+	if (fwhost != None):
+		if (fwport == None):
+			fwport = port
+		log("Replicating packets to %s:%d." % (fwhost, fwport))
 
 	if (simstr):
 		log("Simulating input: %s" % simstr)

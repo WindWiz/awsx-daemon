@@ -59,3 +59,25 @@ awsxd.py -c mycallback.sh
 mycallback.sh:
 #!/bin/sh
 echo "Station $* just sent us new data .. "
+
+7) (Optional) If you want to chain all received packets to another host, you may
+enable the awsxd packet replication support. When enabled, awsxd will replicate
+all valid (verified) packets, package it into a new UDP packet and send it to a
+host of your choice. Invalid packets will be discarded.
+
+This feature is useful because the AWS-X station itself only supports
+transmission to a single host. If multiple systems contend for the sensor data,
+the only way to share is by opening up your MySQL database. This is not
+recommended as clients must rely on polling to detect new samples. It is also
+not recommended to expose your MySQL instance to the public network.
+
+Instead it is recommended to run multiple instances of awsxd, possibly on
+different machines and networks, which each maintain a database of samples. This
+is possible using the packet replication feature.
+
+As packet replication also functions locally on a single machine, it may be used
+to logically separate two systems and feed them individually. This is useful if
+you want to run both your prototype and production environment with live data.
+
+Example:
+awsxd.py -r myhost.com:9405
