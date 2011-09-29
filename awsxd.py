@@ -209,18 +209,18 @@ def process(str):
 	if (not cur.execute(q)):
 		log("Failed to insert record: '%s'" % q)
 		return
-	
-	# Run callback (if any)
-	if (callback):
-		ret = subprocess.call([callback, p[Pkt.ID]])
-		if (ret):
-			print "Callback '%s' failed with retcode %d" % (callback, ret)
 
 	if (fwhost):
 		sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 		sock.sendto(str, (fwhost, fwport))
 		dbg("Packet replicated for %s:%d." % (fwhost, fwport))
 		sock.close()
+
+	# Run callback (if any)
+	if (callback):
+		ret = subprocess.call([callback, p[Pkt.ID]])
+		if (ret):
+			print "Callback '%s' failed with retcode %d" % (callback, ret)
 
 if __name__ == "__main__":
 	config = ConfigParser.RawConfigParser({'dbhost': 'localhost',
