@@ -23,6 +23,7 @@ options:
 -c <path>		Launch <path> for each processed packet (station name passed as arg)
 -f <path>		Config file (defaults to 'awsxd.conf')
 -r <ip[:port]>		Replicate valid packets to given host and port (UDP)
+-i <pidfile>		Process ID file (defaults to '/tmp/awsxd.pid')
 """
 
 import SocketServer
@@ -227,7 +228,8 @@ if __name__ == "__main__":
 										   'dbpass': '',
 										   'dbuser': 'awsxd',
 										   'dbname': 'awsxd'})
-	
+
+	pidfile = "/tmp/awsxd.pid"
 	host = "localhost"
 	port = 9999
 	verbose = 0
@@ -236,9 +238,9 @@ if __name__ == "__main__":
 	simstr = False
 	fwhost = None
 	fwport = None
-		
+			
 	try:
-		opts, args = getopt.getopt(sys.argv[1:], 'p:h:vs:c:f:r:')
+		opts, args = getopt.getopt(sys.argv[1:], 'p:h:vs:c:f:r:i:')
 	except getopt.error, msg:
 		usage(msg)
 
@@ -248,6 +250,7 @@ if __name__ == "__main__":
 		if o == '-h': host = a
 		if o == '-f': cfgfile = a
 		if o == '-s': simstr = a
+		if o == '-i': pidfile = a
 		if o == '-r':
 			hostport = a.split(':')
 			if len(hostport) > 2:
@@ -279,7 +282,19 @@ if __name__ == "__main__":
 		log("Simulating input: %s" % simstr)
 		process(simstr)
 	else:
+		pid = str(os.getpid())
+	
+		if os.path.isfile(pidfile):
+			print "%s already exists, exiting." % pidfile
+			sys.exit(1)
+
+	   	file(pidfile, 'w').write(pid)
+
 		log("Listening at %s:%d" % (host, port))
-		server = SocketServer.UDPServer((host, port), AWSHandler)		
-		server.serve_forever()
+		try:
+			server = SocketServer.UDPServer((host, port), AWSHandler)
+			server.serve_forever()
+		except:
+			os.unlink(pidfile)
+			raise
 
