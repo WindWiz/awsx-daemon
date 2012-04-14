@@ -1,0 +1,53 @@
+.TH awsxd 1 GPLv3
+.SH NAME
+awsxd - DPS Promatic AWS-X weather station daemon.
+.SH SYNOPSIS
+.B awsxd.py [options]
+.SH AVAILABILITY
+All Python-enabled platforms.
+.SH DESCRIPTION
+This application implements an server for reception of AWS-X GSM weather 
+station UDP packets. For each received packet, the contents will be decoded,
+verified and inserted into the given MySQL database.
+
+For details on the sensor hardware, see the DSP Promatic webpage at: http://www.dps-promatic.com/
+  
+For details on the GPRS functionality, check: http://www.dpspro.com/aws_gprs.htmlhttp://www.dpspro.com/aws_gprs.html
+.SH CONFIGURATION
+awsxd is configured partly through its configuration file and partly through the use of command-line options (see below). By default
+the config is read from 'awsxd.conf'. The layout is standard key=value style. awsxd.conf.sample contains a sample configuration in
+which all available keys are listed. It is recommended to start from this file and adjust it to your environment.
+
+.SH OPTIONS
+List of available of command-line options.
+.TP 5
+-p <port>
+Server listen port number. Defaults to 9999.
+.TP
+-h <host>
+Server listen address. Defaults to localhost.
+.TP
+-v
+Verbose output (may be used multiple times)
+.TP
+-s <str>
+Simulate reception of packet with payload <str> (for debugging only)
+.TP
+-c <path>
+Callback path. This will be executed for each valid packet received by the daemon. Station name will be passed as first argument.
+.TP
+-f <path>
+Config file. Defaults to 'awsxd.conf'.
+.TP
+-r <ip[:port]>
+Replicate valid packets to given host and port (UDP). If port is not specified, server listen port will be used (9999 or value set by -p).
+.SH EXAMPLES
+.TP
+In this example, awsxd will listen for packets on 192.168.0.10 port 9999. Upon receiving a valid packet it will launch shellscript './update.sh' with the relevant station name as its first argument.
+
+awsxd.py -p 9999 -h 192.168.0.10 -c ./update.sh
+.SH LICENSE
+awsxd is licensed under GPL version 3. Please refer to LICENSE for details.
+.SH AUTHOR
+Magnus Olsson <magnus@minimum.se>
+
