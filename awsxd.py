@@ -1,9 +1,9 @@
-#! /usr/bin/env python2
-# Copyright (c) 2010-2011 Magnus Olsson (magnus@minimum.se)
+#! /usr/bin/env python
+# Copyright (c) 2010-2013 Magnus Olsson (magnus@minimum.se)
 # See LICENSE for details
 
 """awsxd - AWS-X GSM weather station daemon
-This application implements an server for reception of AWS-X GSM weather 
+This application implements an server for reception of AWS-X GSM weather
 station UDP packets. For each received packet, the contents will be decoded,
 verified and inserted into the given MySQL database.
 
@@ -11,7 +11,8 @@ For details on the sensor hardware, see the DSP Promatic webpage at:
   http://www.dps-promatic.com/
 
 For details on the GPRS functionality, check:
-  http://www.dpspro.com/aws_gprs.htmlhttp://www.dpspro.com/aws_gprs.html
+  http://www.dpspro.com/aws_gprs.html
+  http://www.dps-promatic.com/tcs_meteo_packet.html
   
 usage: awsxd [options]
 
@@ -41,51 +42,149 @@ global config
 global fwhost
 global fwport
 
-# Fancy name -> Part array index enum
-class Pkt:
-    CMD	= 0
-    DATE	= 1
-    TIME	= 2
-    ID	= 3	
-    SMSC	= 4
-    SI	= 5
-    AVGWND	= 6
-    PRESS	= 7
-    MINWND	= 8
-    MAXWND	= 9
-    DGUST	= 10
-    LEAF	= 11
-    WNDDIR	= 12
-    WNDSTAB	= 13
-    SUNRAD	= 14
-    AIRTEMP	= 15
-    DMINTMP	= 16
-    DMAXTMP	= 17
-    SOILT	= 18
-    RAIN	= 19
-    DRAIN	= 20
-    SOILM	= 21
-    DEWPT	= 22
-    RH	= 23
-    DMINRH	= 24
-    DMAXRH	= 25
-    PWR	= 26
-    VBAT	= 27
-    CSUM	= 28
+class NMEAException(Exception):
+    pass
+
+class NMEASentence:
+    def __init__(self, str):
+        left = str.find("$")
+        if (left == -1):
+            raise NMEAException("Invalid packet (no $ present)")
+
+        right = str.find("*")
+        if (right == -1):
+            raise NMEAException("Invalid packet (no * present)")
+
+        self.payload = str[left+1:right]
+
+        actual_csum = self.checksum()
+        expected_csum = int(str[right+1:], 16)
+
+        if (actual_csum != expected_csum):
+            raise NMEAException("Checksum mismatch (0x%02X != 0x%02X)" % (actual_csum, expected_csum))
+
+        self.fields = str[left+1:right].split(',')
+
+    def checksum(self):
+        actual_checksum = 0
+        for c in self.payload:
+            actual_checksum = actual_checksum ^ ord(c)
+
+        return actual_checksum
+
+    def encode(self):
+        return "$%s*%02X" % (self.payload, self.checksum())
+
+class AWSException(Exception):
+    pass
+
+class AWSPacket(NMEASentence):
+    def _parseDec(value):
+        return int(value, 10)
+
+    def _parseString(value):
+        return value
+
+    def _parseDate(value):
+        return value
+
+    def _parseTime(value):
+        return value
+
+    def _parseFloat(value):
+        return float(value)
+
+    _awsFields = [
+        # Packet header, always 'DPTAW'
+        { 'tag': "header", 'f': _parseString },
+        # Date in yyyy/mm/dd format
+        { 'tag': "date", 'f': _parseDate },
+        # Time in hh:mm (24h) format
+        { 'tag': "time", 'f': _parseTime },
+        # Station ID (10)
+        { 'tag': "id", 'f': _parseString },
+        # SMS serial number (SMS counter)
+        { 'tag': "smsc", 'f': _parseDec },
+        # Sample interval 
+        { 'tag': "si", 'f': _parseFloat },
+        # Wind average speed ('si' period, 1 sample/second)
+        { 'tag': "was", 'f': _parseFloat },
+        # Air pressure (millibars)
+        { 'tag': "wssd", 'f': _parseFloat },
+        # Minimum wind speed ('si' period, 1 sample/second)
+        { 'tag': "wmins", 'f': _parseFloat },  
+        # Max wind gust (3s gusts) ('si' period, 1 sample/second)
+        { 'tag': "wgust", 'f': _parseFloat },  
+        # Daily gust (maximum gust of the day)
+        { 'tag': "dwgust", 'f': _parseFloat },
+        # Leaf wetness
+        { 'tag': "leaf_wetness", 'f': _parseDec },
+        # Average wind direction ('si' period, 1 sample/second)
+        { 'tag': "wdir", 'f': _parseDec },
+        # Wind direction, standard deviation
+        { 'tag': "wdsd", 'f': _parseDec },
+        # Solar radiation
+        { 'tag': "sun", 'f': _parseDec },
+        # Average temperature ('si' period, 1 sample/second)
+        { 'tag': "temp", 'f': _parseFloat },
+        # Daily minimum temperature
+        { 'tag': "dmintemp", 'f': _parseFloat },
+        # Daily maximum temperature
+        { 'tag': "dmaxtemp", 'f': _parseFloat },
+        # Soil temperature
+        { 'tag': "soilt", 'f': _parseFloat },
+        # Rainfall
+        { 'tag': "rf", 'f': _parseFloat },
+        # Daily rainfall
+        { 'tag': "drf", 'f': _parseFloat },
+        # Soil water potential
+        { 'tag': "soilw", 'f': _parseDec },
+        # Dew point
+        { 'tag': "dp", 'f': _parseFloat },
+        # Relative humidity
+        { 'tag': "rh", 'f': _parseFloat },
+        # Daily minimum relative humidity
+        { 'tag': "dminrh", 'f': _parseFloat },
+        # Daily maximum relative humidity
+        { 'tag': "dmaxrh", 'f': _parseFloat },
+        # Power supply type (E=External/Solar, B=Battery)
+        { 'tag': "pwtype", 'f': _parseString },
+        # Battery voltage
+        { 'tag': "battvolt", 'f': _parseFloat },
+        # Dummy (trailing comma -- always blank)
+        { 'tag': "blank", 'f': _parseString }
+    ]
+
+    def __init__(self, str):
+        NMEASentence.__init__(self, str)
+
+        if (len(self.fields) != len(self._awsFields)):
+            raise AWSException("Invalid fieldcount (%d)" % len(self.fields))
+
+        if (self.fields[0] != "DPTAW"):
+            raise AWSException("Unknown packet type %s" % self.fields[0])
+
+        self._awsValues = {}
+        try:
+            for idx, field in enumerate(self._awsFields):
+                self._awsValues[field["tag"]] = field["f"](self.fields[idx])
+        except Exception as x:
+            raise AWSException("Parse error for %s: %s (%s)" % (field["tag"], self.fields[idx], x))
+
+    def __str__(self):
+        return self._awsValues.__str__()
+
+    def get(self, field):
+        if field in self._awsValues:
+            return self_awsValues[field]
+        else:
+            return None
 
 def usage(*args):
     sys.stdout = sys.stderr
     print __doc__
     for msg in args: print msg
     sys.exit(2)
-
-class AWSHandler(SocketServer.BaseRequestHandler):
-    def handle(self):
-        data = self.request[0].strip()
-        socket = self.request[1]
-        dbg("Received %d bytes from %s: " % (len(data), self.client_address[0]))
-        dbg(data)
-        process(data)		
 
 def log(str):
     if (verbose > 0):
@@ -95,133 +194,101 @@ def dbg(str):
     if (verbose > 1):
         print str
 
-""" Process a AWS-X packet. Recognized format (always on a SINGLE line):
+def run_callback(packet):
+    ret = subprocess.call([callback, packet.get('id')])
+    if (ret):
+        print "Callback '%s' failed with retcode %d" % (callback, ret)
 
-$DPTAW,             # Command, always $DPTAW
-<date>,             # Ex: 2010/03/21
-<time>,             # Ex: 04:48
-<station_name>,     # Unique name set by SMS for each station
-<sms count>,        # SMS count, may be used for sequencing
-<interval>,         # Current sample interval, in minutes (1-60)
-<avg_windspeed>,    # Windspeed, in km/h
-<air_pressure>,     # Atmospheric air pressure, in millibar
-<wind_min>,         # Max windspeed during interval, in km/h
-<wind_max>,         # Min windspeed during interval, in km/h
-<dailygust>,        # Daily maxwindspeed, in km/h
-<leaf>,             # Leaf wetness, 0=wet to 15=dry
-<wdir>,             # Average wind direction during interval, in degs.
-<wdir_stability>,   # Wind dir. variability, 0=steady to 15=unstable
-<sun_radiation>,    # Solar radiation, in W/Mq
-<avg_airtemp>,      # Average air temperature, in celcius degs.
-<mindailytemp>,     # Daily min temperature, in celcius degs.
-<maxdailytemp>,     # Daily max temperature, in celcius degs.
-<soil_temp>,        # Soil temperature, in celcius degs
-<rainfall>,         # Rainfall during interval, in mm (??)
-<daily_rainfall>,   # Daily rainfall
-<soil_moisture>,    # Soil moisture, 0=wet to 200=dry (Kpa)
-<dewpoint>,         # Dewpoint (extrapolated)
-<humidity>,         # Relative humidity
-<daily minhumidity>,    # Daily minimum relative humidity
-<daily maxhumidity>,    # Daily maximum relative humidity
-<pwrtype>,              # Power supply (E=External, B=Battery)
-<battery_voltage>       # Current battery voltage
-<checksum>              # NMEA 0183-style checksum (8-bit XOR between $ and * delimiters)
+def forward_packet(pkt):
+    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    sock.sendto(pkt.encode(), (fwhost, fwport))
+    dbg("Packet replicated for %s:%d." % (fwhost, fwport))
+    sock.close()
 
-Example:
-    $DPTAW,2003/03/19,04:48,AWSTEST,0027,10,53,1199,47,61,83, \
-    0,244,1,1531,16.0,15.0,17.0,102.0,0.0,0.0,0,13.0,84.9,82.0, \ 
-    99.0,E,13.1,*56
 
-"""
-def process(str):	
-    # Calculate checksum
-    left = str.find("$")
-    if (left == -1):
-        log("Invalid packet (no $ present): %s" % str)
-        return
-
-    right = str.find("*")
-    if (right == -1):
-        log("Invalid packet (no * present): %s" % str)
-        return
-
-    payload = str[left+1:right]
-    actual_checksum = 0
-    for c in payload:
-        actual_checksum = actual_checksum ^ ord(c)
-
-    dbg("Payload checksum is %.2X" % actual_checksum)
-
-    p = str.split(',')
-
-    # Sanity checks
-    if (len(p) != 29):
-        log("Invalid packet (partcount): %s" % str)
-        return
-    	
-    if (p[Pkt.CMD] != "$DPTAW"):
-        log("Invalid packet (id): %s" % str)
-        return
-
-    checksum = int(p[Pkt.CSUM][1:3], 16)
-    if (actual_checksum != checksum):
-        print "Checksum failed for '%s'. Calculated=0x%.2X Expected=0x%.2X" % (str, actual_checksum, checksum)
-        return
-
-    # Debug packet 
-    dbg("%s, last %d minutes (sms #%d)" % (p[Pkt.ID], int(p[Pkt.SI]), int(p[Pkt.SMSC])))
-    dbg("==============================")
-
-    dbg("-- Date %s %s" % (p[Pkt.DATE], p[Pkt.TIME]))
-
-    dbg("-- Wind current %d km/h, min %d km/h, max %d km/h, daily max %d km/h" % 
-        (int(p[Pkt.AVGWND]), int(p[Pkt.MINWND]), int(p[Pkt.MAXWND]), int(p[Pkt.DGUST])))
-
-    stability = (1 - (float(p[Pkt.WNDSTAB]) / 15))*100
-    dbg("-- Wind direction %d degrees, stability %d percent" % 
-        (int(p[Pkt.WNDDIR]), int(stability)))		
-    	
-    dbg("-- Temp current %d C, daily min %d C, daily max %d C" % 
-        (float(p[Pkt.AIRTEMP]), float(p[Pkt.DMINTMP]), float(p[Pkt.DMAXTMP])))
-
-    # Insert into DB
-    db = MySQLdb.connect(host=config.get('mysql', 'dbhost'), 
+def insert_database(pkt):
+    db = MySQLdb.connect(host=config.get('mysql', 'dbhost'),
                          user=config.get('mysql', 'dbuser'),
-                         passwd=config.get('mysql', 'dbpass'), 
+                         passwd=config.get('mysql', 'dbpass'),
                          db=config.get('mysql', 'dbname'))
     cur = db.cursor()
 
-    # TODO: Clean this mess up; Needs proper prepared queries and injection protection
-    q = """INSERT INTO awsx (tstamp, station, sms_counter, sample_interval, wind_avg, 
-            wind_min, wind_max, wind_daily_max, wind_dir, wind_stability, 
-            air_pressure, leaf_wetness, sun_radiation, temp_avg, 
-            temp_daily_min, temp_daily_max, soil_temp, rainfall,
-            rainfall_daily, soil_moisture, dewpoint, humidity,
-            humidity_daily_min, humidity_daily_max, power_supply,
-            battery_voltage) VALUES ('%s', '%s', '%s', '%s', '%s', '%s', '%s',
-            '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s',
-            '%s', '%s', '%s')""" % (p[Pkt.DATE]+" "+p[Pkt.TIME], p[Pkt.ID], p[Pkt.SMSC], p[Pkt.SI],
-            p[Pkt.AVGWND], p[Pkt.MINWND], p[Pkt.MAXWND], p[Pkt.DGUST], p[Pkt.WNDDIR],
-            p[Pkt.WNDSTAB], p[Pkt.PRESS], p[Pkt.LEAF], p[Pkt.SUNRAD], p[Pkt.AIRTEMP],
-            p[Pkt.DMINTMP], p[Pkt.DMAXTMP], p[Pkt.SOILT], p[Pkt.RAIN], p[Pkt.DRAIN],
-            p[Pkt.SOILM], p[Pkt.DEWPT], p[Pkt.RH], p[Pkt.DMINRH], p[Pkt.DMAXRH],
-            p[Pkt.PWR], p[Pkt.VBAT])
-    dbg(q)
-    if (not cur.execute(q)):
-        log("Failed to insert record: '%s'" % q)
-        return
+    q = """INSERT INTO awsx
+(
+    tstamp, station, sms_counter, sample_interval, wind_avg,
+    wind_min, wind_max, wind_daily_max, wind_dir, wind_stability,
+    air_pressure, leaf_wetness, sun_radiation, temp_avg, temp_daily_min,
+    temp_daily_max, soil_temp, rainfall, rainfall_daily, soil_moisture,
+    dewpoint, humidity, humidity_daily_min, humidity_daily_max, power_supply,
+    battery_voltage
+)
+VALUES (
+    %s, %s, %s, %s, %s,
+    %s, %s, %s, %s, %s,
+    %s, %s, %s, %s, %s,
+    %s, %s, %s, %s, %s,
+    %s, %s, %s, %s, %s,
+    %s
+)"""
 
-    if (fwhost):
-        sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        sock.sendto(str, (fwhost, fwport))
-        dbg("Packet replicated for %s:%d." % (fwhost, fwport))
-        sock.close()
+    values = (pkt.get('date') + " " + pkt.get('time'),
+              pkt.get('id'),
+              pkt.get('smsc'),
+              pkt.get('si'),
+              pkt.get('was'),
+              pkt.get('wmins'),
+              pkt.get('wgust'),
+              pkt.get('dwgust'),
+              pkt.get('wdir'),
+              pkt.get('wdsd'),
+              pkt.get('wssd'),
+              pkt.get('leaf_wetness'),
+              pkt.get('sun'),
+              pkt.get('temp'),
+              pkt.get('dmintemp'),
+              pkt.get('dmaxtemp'),
+              pkt.get('soilt'),
+              pkt.get('rf'),
+              pkt.get('drf'),
+              pkt.get('soilw'),
+              pkt.get('dp'),
+              pkt.get('rh'),
+              pkt.get('dminrh'),
+              pkt.get('dmaxrh'),
+              pkt.get('pwtype'),
+              pkt.get('battvolt'))
 
-    # Run callback (if any)
-    if (callback):
-        ret = subprocess.call([callback, p[Pkt.ID]])
-        if (ret):
-            print "Callback '%s' failed with retcode %d" % (callback, ret)
+    if (not cur.execute(q, values)):
+        expanded_q = q % values
+        log("Failed to insert record: '%s'" % expanded_q)
+        return False
+
+    return True
+
+def process(str, source = None):
+    if source is not None:
+        dbg("Received from %s" % source)
+    dbg("Processing %d bytes: %s" % (len(str), str))
+
+    try:
+        packet = AWSPacket(str)
+        
+        log(packet)
+        insert_database(packet)
+
+        if fwhost:
+            forward_packet(packet)
+
+        if callback:
+            run_callback(packet)
+    except Exception as e:
+        print(e)
+
+class AWSHandler(SocketServer.BaseRequestHandler):
+    def handle(self):
+        data = self.request[0]
+        ip = self.client_address[0]
+        process(data, ip)     
 
 if __name__ == "__main__":
     config = ConfigParser.RawConfigParser({'dbhost': 'localhost',
@@ -233,7 +300,7 @@ if __name__ == "__main__":
     host = "localhost"
     port = 9999
     verbose = 0
-    callback = False
+    callback = None
     cfgfile = "awsxd.conf"
     simstr = False
     fwhost = None
