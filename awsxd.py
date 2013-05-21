@@ -25,6 +25,7 @@ options:
 -f <path>       Config file (defaults to 'awsxd.conf')
 -r <ip[:port]>  Replicate valid packets to given host and port (UDP)
 -i <pidfile>    Process ID file (defaults to '/tmp/awsxd.pid')
+-m <unit>       Windspeed unit ('kmh' (default), 'knots' or 'ms')
 """
 
 import SocketServer
@@ -41,6 +42,7 @@ global callback
 global config
 global fwhost
 global fwport
+global speed_multiplier
 
 class NMEAException(Exception):
     pass
@@ -176,7 +178,7 @@ class AWSPacket(NMEASentence):
 
     def get(self, field):
         if field in self._awsValues:
-            return self_awsValues[field]
+            return self._awsValues[field]
         else:
             return None
 
@@ -235,10 +237,10 @@ VALUES (
               pkt.get('id'),
               pkt.get('smsc'),
               pkt.get('si'),
-              pkt.get('was'),
-              pkt.get('wmins'),
-              pkt.get('wgust'),
-              pkt.get('dwgust'),
+              pkt.get('was')*speedmultiplier,
+              pkt.get('wmins')*speedmultiplier,
+              pkt.get('wgust')*speedmultiplier,
+              pkt.get('dwgust')*speedmultiplier,
               pkt.get('wdir'),
               pkt.get('wdsd'),
               pkt.get('wssd'),
@@ -257,6 +259,8 @@ VALUES (
               pkt.get('dmaxrh'),
               pkt.get('pwtype'),
               pkt.get('battvolt'))
+
+    dbg(q % values)
 
     if (not cur.execute(q, values)):
         expanded_q = q % values
@@ -305,14 +309,25 @@ if __name__ == "__main__":
     simstr = False
     fwhost = None
     fwport = None
+    speedmultiplier = 1/3.6
 
     try:
-        opts, args = getopt.getopt(sys.argv[1:], 'p:h:vs:c:f:r:i:')
+        opts, args = getopt.getopt(sys.argv[1:], 'p:h:vs:c:f:r:i:m:')
     except getopt.error, msg:
         usage(msg)
 
     for o, a in opts:
         if o == '-p': port = int(a)
+        if o == '-m':
+            if a == 'kmh':
+                speedmultiplier = 1/3.6
+            elif a == 'knots':
+                speedmultiplier = 0.514
+            elif a == 'ms':
+                speedmultiplier = 1.0
+            else:
+                print "Invalid unit '%s'" % a
+                sys.exit(1)
         if o == '-v': verbose = verbose + 1
         if o == '-h': host = a
         if o == '-f': cfgfile = a
