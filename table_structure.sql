@@ -5,10 +5,10 @@ CREATE TABLE awsx (
   station varchar(255) NOT NULL,
   sms_counter int(11) NOT NULL,
   sample_interval int(11) NOT NULL,
-  wind_avg int(11) NOT NULL,
-  wind_min int(11) NOT NULL,
-  wind_max int(11) NOT NULL,
-  wind_daily_max int(11) NOT NULL,
+  wind_avg float NOT NULL,
+  wind_min float NOT NULL,
+  wind_max float NOT NULL,
+  wind_daily_max float NOT NULL,
   wind_dir int(11) NOT NULL,
   wind_stability int(11) NOT NULL,
   air_pressure int(11) NOT NULL,
@@ -29,4 +29,3 @@ CREATE TABLE awsx (
   battery_voltage float NOT NULL,
   PRIMARY KEY  (id)
 ) ENGINE=MyISAM  DEFAULT CHARSET=latin1;
-
