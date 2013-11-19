@@ -20,32 +20,37 @@ the manual for details: http://www.dpspro.com/docs/pdf/awx_1v1_en.pdf
 
 All configuration is carried out through SMS to your device. Short summary:
 
-	Configure APN:
-	--------------
-	This will configure the APN (Access Point Name) which is an operator-specific
-	setting. Contact your mobile operator for details.
+    Configure APN:
+    --------------
+    This will configure the APN (Access Point Name) which is an operator-specific
+    setting. Contact your mobile operator for details.
 
-	#PWD<6-digit-password>#APN<apn>	
-	Example: #PWD123456#APNonline.telia.com (set APN to online.telia.com)
+    #PWD<6-digit-password>#APN<apn>#
+    Example: #PWD123456#APNonline.telia.se# (set APN to online.telia.com)
 
-	Configure packet destination:
-	-----------------------------
-	It's important that you zeropad your IP, so it's always xxx.yyy.zzz.vvv, for
-	example 8.8.8.8 should be 008.008.008.008.
+    Configure packet destination:
+    -----------------------------
+    It's important that you zeropad your IP, so it's always xxx.yyy.zzz.vvv, for
+    example 8.8.8.8 should be 008.008.008.008.
 
-	#PWD<6-digit-password>#UIP<listen_ip>:<listen_port>
-	Example: #PWD123456#UIP083.168.059.029:9999 (transmit to 83.168.59.29:9999)
+    #PWD<6-digit-password>#UIP<listen_ip>:<listen_port>#
+    Example: #PWD123456#UIP083.168.059.029:9999# (transmit to 83.168.59.29:9999)
 
-	Configure sample interval: 
-	--------------------------
-	#PWD<6-digit-password>#DSI<1-60 minutes>
-	Example: #PWD123456#DSI10	(sample every 10 minutes)
+    Configure sample interval:
+    --------------------------
+    #PWD<6-digit-password>#DSI<1-60 minutes>
+    Example: #PWD123456#DSI10	(sample every 10 minutes)
 
-	Configure transmission interval: 
-	--------------------------------
-	#PWD<6-digit-password>#LGG<1-60 minutes>
-	This should always be equal or bigger than the sample interval
-	Example: #PWD123456#LGG10	(transmit every 10 minutes)
+    Configure transmission interval:
+    --------------------------------
+    #PWD<6-digit-password>#LGG<1-60 minutes>#
+    This should always be equal or bigger than the sample interval
+    Example: #PWD123456#LGG10	(transmit every 10 minutes)
+
+    Configure windspeed measurement unit:
+    #PWD<6-digit-password>#SWU<unit>#
+    Where <unit> is a number 0-3; 0=Km/h, 1=Mph, 2=Knots, 3=m/s
+    Example: #PWD123456#SWU3#
 
 6) (Optional) It is also possible to specify a callback file which is executed
 each time new data arrives on the socket. This is useful if you want to generate
