@@ -13,7 +13,7 @@ For details on the sensor hardware, see the DSP Promatic webpage at:
 For details on the GPRS functionality, check:
   http://www.dpspro.com/aws_gprs.html
   http://www.dps-promatic.com/tcs_meteo_packet.html
-  
+
 usage: awsxd [options]
 
 options:
@@ -107,16 +107,16 @@ class AWSPacket(NMEASentence):
         { 'tag': "id", 'f': _parseString },
         # SMS serial number (SMS counter)
         { 'tag': "smsc", 'f': _parseDec },
-        # Sample interval 
+        # Sample interval
         { 'tag': "si", 'f': _parseFloat },
         # Wind average speed ('si' period, 1 sample/second)
         { 'tag': "was", 'f': _parseFloat },
         # Air pressure (millibars)
         { 'tag': "wssd", 'f': _parseFloat },
         # Minimum wind speed ('si' period, 1 sample/second)
-        { 'tag': "wmins", 'f': _parseFloat },  
+        { 'tag': "wmins", 'f': _parseFloat },
         # Max wind gust (3s gusts) ('si' period, 1 sample/second)
-        { 'tag': "wgust", 'f': _parseFloat },  
+        { 'tag': "wgust", 'f': _parseFloat },
         # Daily gust (maximum gust of the day)
         { 'tag': "dwgust", 'f': _parseFloat },
         # Leaf wetness
@@ -191,7 +191,7 @@ def usage(*args):
 def log(str):
     if (verbose > 0):
         print str
-		
+
 def dbg(str):
     if (verbose > 1):
         print str
@@ -276,7 +276,7 @@ def process(str, source = None):
 
     try:
         packet = AWSPacket(str)
-        
+
         log(packet)
         insert_database(packet)
 
@@ -292,7 +292,7 @@ class AWSHandler(SocketServer.BaseRequestHandler):
     def handle(self):
         data = self.request[0]
         ip = self.client_address[0]
-        process(data, ip)     
+        process(data, ip)
 
 if __name__ == "__main__":
     config = ConfigParser.RawConfigParser({'dbhost': 'localhost',
@@ -345,8 +345,8 @@ if __name__ == "__main__":
 
         if o == '-c':
             if (not os.path.isfile(a)):
-                print "No such callback file '%s', aborting." % a 
-                sys.exit(1)			
+                print "No such callback file '%s', aborting." % a
+                sys.exit(1)
             if (not os.access(a, os.X_OK)):
                 print "Specified callback file '%s' is not an executable." % a
                 sys.exit(1)
