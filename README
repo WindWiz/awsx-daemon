@@ -16,7 +16,13 @@ example config file included called awsxd.conf.sample.
 	awsxd.py -h <listen_ip> -p <listen_port>
 
 5) Configure your AWS-X weather station to transmit packets to your host. Check
-the manual for details: http://www.dpspro.com/docs/pdf/awx_1v1_en.pdf
+the manual for details: 
+	
+	http://www.dpspro.com/docs/pdf/awx_1v1_en.pdf
+	
+The TCS OS (which runs on the AWS-X motherboard) also lists a few commands:
+	
+	http://www.dpspro.com/tcs_commands/tcsos_list.html
 
 All configuration is carried out through SMS to your device. Short summary:
 
@@ -48,6 +54,7 @@ All configuration is carried out through SMS to your device. Short summary:
     Example: #PWD123456#LGG10	(transmit every 10 minutes)
 
     Configure windspeed measurement unit:
+    -------------------------------------
     #PWD<6-digit-password>#SWU<unit>#
     Where <unit> is a number 0-3; 0=Km/h, 1=Mph, 2=Knots, 3=m/s
     Example: #PWD123456#SWU3#
